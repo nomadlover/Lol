@@ -1,1 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Supply Chain Risk Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- Load Lucide icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Configure Tailwind to use Inter font and a dark theme -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+        }
+        /* Custom loader spinner for better UX */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366F1;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 text-white">
 
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-400">
+                Supply Chain Risk Monitor
+            </h1>
+            <p class="text-gray-400 mt-1">Macroeconomic, Geopolitical & Logistics Risk Analysis Dashboard</p>
+        </header>
+
+        <!-- Control Panel & Filters -->
+        <div class="bg-gray-800 p-4 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex-grow w-full md:w-auto">
+                <label for="countrySelect" class="block text-sm font-medium text-gray-300 mb-1">Select Anchor Country / Hub:</label>
+                <select id="countrySelect" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 transition duration-150 ease-in-out">
+                    <option value="USA" selected>USA (Consumption Hub)</option>
+                    <option value="China">China (Manufacturing Hub)</option>
+                    <option value="Germany">Germany (Industrial Core)</option>
+                    <option value="Brazil">Brazil (Commodity Producer)</option>
+                    <option value="India">India (Emerging Manufacturing/Tech)</option>
+                    <option value="Mexico">Mexico (Nearshoring/NAFTA)</option>
+                    <option value="Vietnam">Vietnam (Alternative Manufacturing)</option>
+                    <option value="SouthKorea">South Korea (High-Tech/Semiconductors)</option>
+                    <option value="SaudiArabia">Saudi Arabia (Energy/Geopolitical Hub)</option>
+                    <option value="Australia">Australia (Resource Exporter)</option>
+                </select>
+            </div>
+            
+            <!-- Removed LLM Button Group -->
+            
+            <div id="selectedCountryRiskTag" class="md:ml-auto w-full md:w-auto text-center md:text-right hidden md:block">
+                <!-- Risk tag injected here -->
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Col 1 & 2: Main Visualization -->
+            <div class="lg:col-span-2">
+                <div id="chartContainer" class="bg-gray-800 p-6 rounded-xl shadow-lg h-full flex flex-col justify-center items-center relative min-h-[300px]">
+                    <div id="chartLoading" class="hidden flex flex-col items-center justify-center absolute inset-0 bg-gray-800/80 z-10 rounded-xl">
+                        <div class="loader"></div>
+                        <p class="mt-4 text-indigo-400">Loading data...</p>
+                    </div>
+                    <h2 class="text-xl font-semibold mb-4 text-indigo-300 w-full">Quarterly Supply Chain Risk Index (SCRI) Trend</h2>
+                    <canvas id="riskChart" class="w-full"></canvas>
+                    <p class="text-xs text-gray-500 mt-4 w-full">SCRI is a weighted average of Geopolitical, Economic, and Logistics factors (Index Score: 0=Low Risk, 100=High Risk).</p>
+                </div>
+            </div>
+
+            <!-- Col 3: Key Metrics & Micro/Macro Analysis -->
+            <div class="lg:col-span-1 flex flex-col space-y-6">
+                
+                <!-- Key Metrics Card -->
+                <div id="metricsCard" class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 text-indigo-300">Key Economic Indicators</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                            <span class="text-sm text-gray-400">GDP Forecast ($$):</span>
+                            <span id="gdpForecast" class="text-lg font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                            <span class="text-sm text-gray-400">Core Inflation (Macro):</span>
+                            <span id="inflationRate" class="text-lg font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between items-center pb-2">
+                            <span class="text-sm text-gray-400">Port Congestion Index:</span>
+                            <span id="portIndex" class="text-lg font-bold">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Risk Profile Summary Card -->
+                <div id="riskProfileCard" class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 text-indigo-300">Current Risk Breakdown</h2>
+                    <div id="riskDetails" class="space-y-3 text-sm">
+                        <!-- Risk factor details injected here -->
+                        <p class="text-gray-400 italic">Data loading...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Removed Gemini Analysis Output Cards -->
+        
+    </div>
+
+    <script>
+        // --- Data Structure (Local Simulation) ---
+        const COUNTRY_DATA = {
+            "USA": {
+                "gdpForecast": "+2.1%",
+                "inflationRate": "3.5%",
+                "currentRiskScore": 58,
+                "portIndex": "45 (Normal)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 65, "status": "High Risk (Tariff volatility, election uncertainty)"},
+                    {"name": "Domestic Labor/Micro", "score": 50, "status": "Moderate (Wage pressure, low availability)"},
+                    {"name": "Logistics Cost Index", "score": 60, "status": "Medium/High (Rising diesel, high trucking rates)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [55, 62, 60, 58, 59, 58]
+                }
+            },
+            "China": {
+                "gdpForecast": "+4.5%",
+                "inflationRate": "1.2%",
+                "currentRiskScore": 78,
+                "portIndex": "85 (Severe)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 85, "status": "Very High Risk (Trade restrictions, regulatory shifts)"},
+                    {"name": "Domestic Labor/Micro", "score": 70, "status": "High (High turnover, compliance risk)"},
+                    {"name": "Logistics Cost Index", "score": 80, "status": "Severe (Capacity limits, port congestion)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [70, 75, 80, 78, 82, 78]
+                }
+            },
+            "Germany": {
+                "gdpForecast": "+0.8%",
+                "inflationRate": "5.1%",
+                "currentRiskScore": 65,
+                "portIndex": "30 (Low)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 70, "status": "High Risk (Energy dependence, Russia sanctions)"},
+                    {"name": "Domestic Labor/Micro", "score": 60, "status": "Medium (High wages, skilled labor shortage)"},
+                    {"name": "Logistics Cost Index", "score": 40, "status": "Low (Efficient inland network)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [68, 65, 62, 60, 64, 65]
+                }
+            },
+            "Brazil": {
+                "gdpForecast": "+2.9%",
+                "inflationRate": "4.0%",
+                "currentRiskScore": 50,
+                "portIndex": "55 (Moderate)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 45, "status": "Low Risk (Commodity price stability)"},
+                    {"name": "Domestic Labor/Micro", "score": 55, "status": "Moderate (Infrastructure quality, local tax complexity)"},
+                    {"name": "Logistics Cost Index", "score": 50, "status": "Moderate (Road network dependency)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [50, 48, 52, 50, 53, 50]
+                }
+            },
+            "India": {
+                "gdpForecast": "+6.5%",
+                "inflationRate": "6.0%",
+                "currentRiskScore": 68,
+                "portIndex": "65 (High)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 60, "status": "Medium Risk (Border tensions, policy uncertainty)"},
+                    {"name": "Domestic Labor/Micro", "score": 75, "status": "High (Infrastructure bottlenecks, skill gaps)"},
+                    {"name": "Logistics Cost Index", "score": 70, "status": "High (Customs delays, transport inefficiency)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [60, 65, 70, 72, 69, 68]
+                }
+            },
+            "Mexico": {
+                "gdpForecast": "+2.0%",
+                "inflationRate": "4.2%",
+                "currentRiskScore": 62,
+                "portIndex": "50 (Moderate)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 55, "status": "Moderate Risk (NAFTA tensions, security concerns)"},
+                    {"name": "Domestic Labor/Micro", "score": 65, "status": "Medium/High (Rising wages, union activity)"},
+                    {"name": "Logistics Cost Index", "score": 70, "status": "High (Cross-border delays, rail capacity)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [58, 60, 64, 66, 63, 62]
+                }
+            },
+            "Vietnam": {
+                "gdpForecast": "+5.5%",
+                "inflationRate": "3.0%",
+                "currentRiskScore": 53,
+                "portIndex": "40 (Normal)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 50, "status": "Low Risk (Favorable trade deals, stable policies)"},
+                    {"name": "Domestic Labor/Micro", "score": 55, "status": "Moderate (Rapid wage growth, worker migration)"},
+                    {"name": "Logistics Cost Index", "score": 55, "status": "Moderate (Coastal port capacity strain)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [55, 52, 50, 54, 56, 53]
+                }
+            },
+            "SouthKorea": {
+                "gdpForecast": "+1.8%",
+                "inflationRate": "3.8%",
+                "currentRiskScore": 59,
+                "portIndex": "35 (Normal)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 70, "status": "High Risk (North Korean tensions, regional diplomacy)"},
+                    {"name": "Domestic Labor/Micro", "score": 50, "status": "Moderate (Aging population, high tech dependence)"},
+                    {"name": "Logistics Cost Index", "score": 55, "status": "Moderate (Energy import costs)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [65, 60, 58, 55, 57, 59]
+                }
+            },
+            "SaudiArabia": {
+                "gdpForecast": "+0.5%",
+                "inflationRate": "2.5%",
+                "currentRiskScore": 75,
+                "portIndex": "60 (Medium/High)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 88, "status": "Very High Risk (Regional conflicts, Strait of Hormuz)"},
+                    {"name": "Domestic Labor/Micro", "score": 40, "status": "Low (Stable energy supply, government funding)"},
+                    {"name": "Logistics Cost Index", "score": 75, "status": "High (Dependence on air/sea routes through flashpoints)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [70, 78, 80, 75, 73, 75]
+                }
+            },
+            "Australia": {
+                "gdpForecast": "+1.5%",
+                "inflationRate": "4.5%",
+                "currentRiskScore": 45,
+                "portIndex": "30 (Low)",
+                "riskDetails": [
+                    {"name": "Geopolitical Stability", "score": 40, "status": "Low Risk (Remote location, strong democratic institutions)"},
+                    {"name": "Domestic Labor/Micro", "score": 45, "status": "Low/Moderate (Union power, high wages)"},
+                    {"name": "Logistics Cost Index", "score": 50, "status": "Moderate (High last-mile cost due to vast distances)"}
+                ],
+                "timeSeries": {
+                    "labels": ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024', 'Q2 2024 (E)'],
+                    "data": [45, 42, 48, 45, 43, 45]
+                }
+            }
+        };
+
+        // --- DOM Elements ---
+        const ctx = document.getElementById('riskChart').getContext('2d');
+        const countrySelect = document.getElementById('countrySelect');
+        const chartLoading = document.getElementById('chartLoading');
+        
+        let riskChart;
+        let currentCountryData; // Global variable to hold current country's data
+
+        // --- Utility Functions ---
+
+        /** Shows a loading spinner and message */
+        function showLoading() {
+            chartLoading.classList.remove('hidden');
+        }
+
+        /** Hides the loading spinner and message */
+        function hideLoading() {
+            chartLoading.classList.add('hidden');
+        }
+
+        /** Determines Tailwind classes based on risk score (0-100) */
+        function getRiskClass(score) {
+            if (score >= 70) return 'text-red-400 bg-red-900/50';
+            if (score >= 55) return 'text-yellow-400 bg-yellow-900/50';
+            return 'text-green-400 bg-green-900/50';
+        }
+
+        /** Determines descriptive text based on risk score */
+        function getRiskText(score) {
+            if (score >= 70) return 'CRITICAL';
+            if (score >= 55) return 'ELEVATED';
+            return 'STABLE';
+        }
+
+        /**
+         * Loads and updates the dashboard with data for the selected country (from local simulation).
+         * @param {string} countryKey The key of the country (e.g., 'USA').
+         */
+        function updateDashboard(countryKey) {
+            showLoading();
+            
+            // 1. Get data from local structure
+            const data = COUNTRY_DATA[countryKey];
+            currentCountryData = data; // Store data globally
+
+            if (!data) {
+                console.error("Error: Country data not found for key:", countryKey);
+                document.getElementById('riskDetails').innerHTML = `<p class="text-red-400">Error: Simulated data not found for this country.</p>`;
+                hideLoading();
+                return;
+            }
+
+            // Simulate network delay for better UX
+            setTimeout(() => {
+                // 2. Update Key Metrics (Macro/Micro)
+                document.getElementById('gdpForecast').textContent = data.gdpForecast;
+                document.getElementById('inflationRate').textContent = data.inflationRate;
+                document.getElementById('portIndex').textContent = data.portIndex;
+                
+                // Set text color based on indicator status (for aesthetics)
+                document.getElementById('gdpForecast').className = `text-lg font-bold ${data.gdpForecast.startsWith('+') ? 'text-green-400' : 'text-red-400'}`;
+                document.getElementById('inflationRate').className = `text-lg font-bold ${parseFloat(data.inflationRate) >= 4.0 ? 'text-red-400' : 'text-green-400'}`;
+                document.getElementById('portIndex').className = `text-lg font-bold ${data.portIndex.includes('Severe') ? 'text-red-400' : data.portIndex.includes('Normal') ? 'text-green-400' : 'text-yellow-400'}`;
+
+
+                // 3. Update Risk Tag
+                document.getElementById('selectedCountryRiskTag').innerHTML = `
+                    <span class="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wider ${getRiskClass(data.currentRiskScore)}">
+                        Current SCRI: ${data.currentRiskScore} (${getRiskText(data.currentRiskScore)})
+                    </span>
+                `;
+                
+                // 4. Update Risk Breakdown (Micro/Business Analysis)
+                const riskDetailsEl = document.getElementById('riskDetails');
+                riskDetailsEl.innerHTML = data.riskDetails.map(detail => `
+                    <div class="p-2 border border-gray-700 rounded-lg transition duration-300 hover:border-indigo-500">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-medium text-gray-200">${detail.name}</span>
+                            <span class="px-2 py-0.5 text-xs font-bold rounded ${getRiskClass(detail.score)}">${detail.score}</span>
+                        </div>
+                        <p class="text-xs text-gray-400">${detail.status}</p>
+                    </div>
+                `).join('');
+
+                // 5. Update Chart
+                const chartData = data.timeSeries;
+                const countryKey = countrySelect.value;
+                
+                if (riskChart) {
+                    // Update existing chart
+                    riskChart.data.labels = chartData.labels;
+                    riskChart.data.datasets[0].data = chartData.data;
+                    riskChart.data.datasets[0].label = `${countryKey} SCRI`;
+                    riskChart.update();
+                } else {
+                    // Initialize chart on first load
+                    riskChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: chartData.labels,
+                            datasets: [{
+                                label: `${countryKey} SCRI`,
+                                data: chartData.data,
+                                borderColor: '#818CF8', // Tailwind indigo-400
+                                backgroundColor: 'rgba(129, 140, 248, 0.2)',
+                                tension: 0.4,
+                                fill: true,
+                                pointRadius: 6,
+                                pointBackgroundColor: '#6366F1',
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            aspectRatio: (window.innerWidth >= 1024) ? 2.5 : 1.5, // Taller on mobile
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    labels: { color: '#ddd' }
+                                },
+                                tooltip: { 
+                                    mode: 'index', 
+                                    intersect: false,
+                                    backgroundColor: 'rgba(31, 41, 55, 0.9)',
+                                    titleColor: '#fff',
+                                    bodyColor: '#ccc',
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `SCRI: ${context.parsed.y}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: '#374151' }, 
+                                    ticks: { color: '#aaa' }
+                                },
+                                y: {
+                                    min: 0,
+                                    max: 100,
+                                    title: { 
+                                        display: true, 
+                                        text: 'Risk Index (0-100)',
+                                        color: '#aaa'
+                                    },
+                                    grid: { color: '#374151' },
+                                    ticks: { color: '#aaa' }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                hideLoading();
+
+            }, 500); // 500ms delay to simulate network latency and show loading state
+        }
+
+        // --- Event Listeners and Initializer ---
+        countrySelect.addEventListener('change', (e) => {
+            updateDashboard(e.target.value);
+        });
+        
+        // Initial Load (using the default selected value)
+        window.onload = function() {
+            updateDashboard(countrySelect.value);
+            // Initialize lucide icons
+            lucide.createIcons();
+        };
+    </script>
+</body>
